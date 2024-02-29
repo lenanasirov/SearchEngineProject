@@ -12,12 +12,13 @@ import pickle
 from google.cloud import storage
 from collections import defaultdict
 from contextlib import closing
+import struct
 
-PROJECT_ID = 'YOUR-PROJECT-ID-HERE'
+PROJECT_ID = 'wikiproject-414111'
 def get_bucket(bucket_name):
     return storage.Client(PROJECT_ID).bucket(bucket_name)
 
-def _open(path, mode, bucket=None):
+def my_open(path, mode, bucket=None):
     if bucket is None:
         return open(path, mode)
     return bucket.blob(path).open(mode)
@@ -31,8 +32,8 @@ class MultiFileWriter:
         self._base_dir = Path(base_dir)
         self._name = name
         self._bucket = None if bucket_name is None else get_bucket(bucket_name)
-        self._file_gen = (_open(str(self._base_dir / f'{name}_{i:03}.bin'), 
-                                'wb', self._bucket) 
+        self._file_gen = (my_open(str(self._base_dir / f'{name}_{i:03}.bin'),
+                                'wb', self._bucket)
                           for i in itertools.count())
         self._f = next(self._file_gen)
            
@@ -67,7 +68,7 @@ class MultiFileReader:
         for f_name, offset in locs:
             f_name = str(self._base_dir / f_name)
             if f_name not in self._open_files:
-                self._open_files[f_name] = _open(f_name, 'rb', self._bucket)
+                self._open_files[f_name] = my_open(f_name, 'rb', self._bucket)
             f = self._open_files[f_name]
             f.seek(offset)
             n_read = min(n_bytes, BLOCK_SIZE - offset)
@@ -83,7 +84,7 @@ class MultiFileReader:
         self.close()
         return False 
 
-TUPLE_SIZE = 6       # We're going to pack the doc_id and tf values in this 
+TUPLE_SIZE = 12       # We're going to pack the doc_id and tf values in this
                      # many bytes.
 TF_MASK = 2 ** 16 - 1 # Masking the 16 low bits of an integer
 
@@ -135,7 +136,7 @@ class InvertedIndex:
     def _write_globals(self, base_dir, name, bucket_name):
         path = str(Path(base_dir) / f'{name}.pkl')
         bucket = None if bucket_name is None else get_bucket(bucket_name)
-        with _open(path, 'wb', bucket) as f:
+        with my_open(path, 'wb', bucket) as f:
             pickle.dump(self, f)
 
     def __getstate__(self):
@@ -168,8 +169,12 @@ class InvertedIndex:
             locs = self.posting_locs[w]
             b = reader.read(locs, self.df[w] * TUPLE_SIZE)
             for i in range(self.df[w]):
-                doc_id = int.from_bytes(b[i*TUPLE_SIZE:i*TUPLE_SIZE+4], 'big')
-                tf = int.from_bytes(b[i*TUPLE_SIZE+4:(i+1)*TUPLE_SIZE], 'big')
+                # doc_id = int.from_bytes(b[i*TUPLE_SIZE:i*TUPLE_SIZE+4], 'big')
+                # tf = int.from_bytes(b[i*TUPLE_SIZE+4:(i+1)*TUPLE_SIZE], 'big')
+                doc_id_bytes = b[i * TUPLE_SIZE: i * TUPLE_SIZE + 4]
+                tf_bytes = b[i * TUPLE_SIZE + 4: (i + 1) * TUPLE_SIZE]
+                doc_id = int.from_bytes(doc_id_bytes, 'big')
+                tf = struct.unpack('>d', tf_bytes)[0]  # Unpack as float
                 posting_list.append((doc_id, tf))
         return posting_list
 
@@ -181,15 +186,18 @@ class InvertedIndex:
         with closing(MultiFileWriter(base_dir, bucket_id, bucket_name)) as writer:
             for w, pl in list_w_pl: 
                 # convert to bytes
-                b = b''.join([(doc_id << 16 | (tf & TF_MASK)).to_bytes(TUPLE_SIZE, 'big')
-                              for doc_id, tf in pl])
+                # b = b''.join([(doc_id << 16 | (tf & TF_MASK)).to_bytes(TUPLE_SIZE, 'big')
+                #               for doc_id, tf in pl])
+                b = b''.join([
+                    struct.pack('>Id', doc_id, tf)  # Pack doc_id as 4 bytes integer and tf as 8 bytes float
+                    for doc_id, tf in pl])
                 # write to file(s)
                 locs = writer.write(b)
                 # save file locations to index
                 posting_locs[w].extend(locs)
             path = str(Path(base_dir) / f'{bucket_id}_posting_locs.pickle')
             bucket = None if bucket_name is None else get_bucket(bucket_name)
-            with _open(path, 'wb', bucket) as f:
+            with my_open(path, 'wb', bucket) as f:
                 pickle.dump(posting_locs, f)
         return bucket_id
 
@@ -198,5 +206,5 @@ class InvertedIndex:
     def read_index(base_dir, name, bucket_name=None):
         path = str(Path(base_dir) / f'{name}.pkl')
         bucket = None if bucket_name is None else get_bucket(bucket_name)
-        with _open(path, 'rb', bucket) as f:
+        with my_open(path, 'rb', bucket) as f:
             return pickle.load(f)
