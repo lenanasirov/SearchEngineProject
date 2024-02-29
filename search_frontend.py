@@ -1,4 +1,7 @@
 from flask import Flask, request, jsonify
+from Backend import *
+
+backend_search = Backend()
 
 class MyFlaskApp(Flask):
     def run(self, host=None, port=None, debug=None, **options):
@@ -31,7 +34,7 @@ def search():
     if len(query) == 0:
       return jsonify(res)
     # BEGIN SOLUTION
-
+    res= backend_search.backend_search(query)
     # END SOLUTION
     return jsonify(res)
 
