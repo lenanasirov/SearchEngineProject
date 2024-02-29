@@ -14,7 +14,7 @@ from collections import defaultdict
 from contextlib import closing
 import struct
 
-PROJECT_ID = 'YOUR-PROJECT-ID-HERE'
+PROJECT_ID = 'wikiproject-414111'
 def get_bucket(bucket_name):
     return storage.Client(PROJECT_ID).bucket(bucket_name)
 
