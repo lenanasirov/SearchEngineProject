@@ -12,6 +12,7 @@ import pickle
 from google.cloud import storage
 from collections import defaultdict
 from contextlib import closing
+import struct
 
 PROJECT_ID = 'YOUR-PROJECT-ID-HERE'
 def get_bucket(bucket_name):
@@ -83,7 +84,7 @@ class MultiFileReader:
         self.close()
         return False 
 
-TUPLE_SIZE = 6       # We're going to pack the doc_id and tf values in this 
+TUPLE_SIZE = 12       # We're going to pack the doc_id and tf values in this
                      # many bytes.
 TF_MASK = 2 ** 16 - 1 # Masking the 16 low bits of an integer
 
@@ -168,8 +169,12 @@ class InvertedIndex:
             locs = self.posting_locs[w]
             b = reader.read(locs, self.df[w] * TUPLE_SIZE)
             for i in range(self.df[w]):
-                doc_id = int.from_bytes(b[i*TUPLE_SIZE:i*TUPLE_SIZE+4], 'big')
-                tf = int.from_bytes(b[i*TUPLE_SIZE+4:(i+1)*TUPLE_SIZE], 'big')
+                # doc_id = int.from_bytes(b[i*TUPLE_SIZE:i*TUPLE_SIZE+4], 'big')
+                # tf = int.from_bytes(b[i*TUPLE_SIZE+4:(i+1)*TUPLE_SIZE], 'big')
+                doc_id_bytes = b[i * TUPLE_SIZE: i * TUPLE_SIZE + 4]
+                tf_bytes = b[i * TUPLE_SIZE + 4: (i + 1) * TUPLE_SIZE]
+                doc_id = int.from_bytes(doc_id_bytes, 'big')
+                tf = struct.unpack('>d', tf_bytes)[0]  # Unpack as float
                 posting_list.append((doc_id, tf))
         return posting_list
 
@@ -181,8 +186,11 @@ class InvertedIndex:
         with closing(MultiFileWriter(base_dir, bucket_id, bucket_name)) as writer:
             for w, pl in list_w_pl: 
                 # convert to bytes
-                b = b''.join([(doc_id << 16 | (tf & TF_MASK)).to_bytes(TUPLE_SIZE, 'big')
-                              for doc_id, tf in pl])
+                # b = b''.join([(doc_id << 16 | (tf & TF_MASK)).to_bytes(TUPLE_SIZE, 'big')
+                #               for doc_id, tf in pl])
+                b = b''.join([
+                    struct.pack('>Id', doc_id, tf)  # Pack doc_id as 4 bytes integer and tf as 8 bytes float
+                    for doc_id, tf in pl])
                 # write to file(s)
                 locs = writer.write(b)
                 # save file locations to index
