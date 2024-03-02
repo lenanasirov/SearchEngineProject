@@ -78,12 +78,12 @@ class Backend:
 
         self.porter_stemmer = PorterStemmer()
         self.bucket_name = 'wikiproject-414111-bucket'
+        self.init_spark()
         self.inverted_title = InvertedIndex.read_index('title_postings', 'index_title', self.bucket_name)
         self.inverted_text = InvertedIndex.read_index('text_postings', 'index_text', self.bucket_name)
         self.title_lengths = InvertedIndex.read_index('title_postings', 'title_lengths', self.bucket_name)
         self.text_lengths = InvertedIndex.read_index('text_postings', 'text_lengths', self.bucket_name)
         self.title_id = InvertedIndex.read_index('.', 'title_id', self.bucket_name)
-        self.init_spark()
 
     def backend_search(self, query):
         stemmed_query = self.stem_query(query)
