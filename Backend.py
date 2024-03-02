@@ -22,13 +22,13 @@ import itertools
 from time import time
 import hashlib
 from inverted_index_gcp import *
-# import pyspark
-# from pyspark.sql import *
-# from pyspark.sql.functions import *
-# from pyspark import SparkContext, SparkConf
-# from pyspark.sql import SQLContext
-# from pyspark.ml.feature import Tokenizer, RegexTokenizer
-# from graphframes import *
+import pyspark
+from pyspark.sql import *
+from pyspark.sql.functions import *
+from pyspark import SparkContext, SparkConf
+from pyspark.sql import SQLContext
+from pyspark.ml.feature import Tokenizer, RegexTokenizer
+from graphframes import *
 def _hash(s):
     return hashlib.blake2b(bytes(s, encoding='utf8'), digest_size=5).hexdigest()
 
@@ -78,11 +78,13 @@ class Backend:
 
         self.porter_stemmer = PorterStemmer()
         self.bucket_name = 'wikiproject-414111-bucket'
-        # self.init_spark()
+        self.init_spark()
         self.inverted_title = InvertedIndex.read_index('title_postings', 'index_title', self.bucket_name)
         self.inverted_text = InvertedIndex.read_index('text_postings', 'index_text', self.bucket_name)
         self.title_lengths = InvertedIndex.read_index('title_postings', 'title_lengths', self.bucket_name)
+        self.title_lengths_rdd = self.sc.parallelize(list(self.title_lengths.items())) # TODO: Add this to bucket
         self.text_lengths = InvertedIndex.read_index('text_postings', 'text_lengths', self.bucket_name)
+        self.text_lengths_rdd = self.sc.parallelize(list(self.text_lengths.items())) # TODO: Add this to bucket
         self.title_id = InvertedIndex.read_index('.', 'title_id', self.bucket_name)
 
     def backend_search(self, query):
