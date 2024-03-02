@@ -64,7 +64,7 @@ class Backend:
                             "many", "however", "would", "became"]
 
         self.all_stopwords = self.english_stopwords.union(self.corpus_stopwords)
-        # self.RE_WORD = re.compile(r"""[\#\@\w](['\-]?\w){2,24}""", re.UNICODE)
+        self.RE_WORD = re.compile(r"""[\#\@\w](['\-]?\w){2,24}""", re.UNICODE)
 
         # self.all_stopwords = self.english_stopwords.union(self.corpus_stopwords)
 
@@ -99,7 +99,9 @@ class Backend:
 
     def stem_query(self, query):
         # Stem the query terms and remove stopwords
-        stemmed_query = [self.porter_stemmer.stem(term) for term in query.split() if term not in self.all_stopwords]
+        stemmed_query = [self.porter_stemmer.stem(term.group()) for term in self.RE_WORD.finditer(query.lower())
+                         if term not in self.all_stopwords]
+        #stemmed_query = [self.porter_stemmer.stem(term) for term in query.split() if term not in self.all_stopwords]
         return stemmed_query
 
     def calculate_cosine_score(self, query, doc_lengths, inverted):
