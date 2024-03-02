@@ -154,8 +154,7 @@ class Backend:
                                                           x[1][1] * self.text_score
                                                           )])
         # Sort docs by score
-        weighted_sum = weighted_sum.sortBy(lambda x: x[1], ascending=False)
-        return weighted_sum
+        return weighted_sum.sortBy(lambda x: x[1], ascending=False)
 
 
     def combine_scores(self, cosine_scores, pagerank_scores, alpha=0.5):
