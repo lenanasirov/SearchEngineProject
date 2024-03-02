@@ -91,7 +91,8 @@ class Backend:
         text_score = self.calculate_cosine_score(stemmed_query, self.text_lengths, self.inverted_text)
         scores = self.weighted_score(title_score, text_score)
         # retrive the top 100 doc ids
-        top_docs = [score[0] for score in scores.take(100)]
+        # top_docs = [score[0] for score in scores.take(100)]
+        top_docs = scores[:100]
         # returns (doc_id, title of doc_id) for the top 100 documents
         top = [(ID, self.title_id[id]) for ID in top_docs]
         return top
@@ -115,46 +116,72 @@ class Backend:
           RDD
             An RDD where each element is a (doc_id, score).
         """
-        doc_lengths_rdd = self.sc.parallelize(list(doc_lengths.items()))
+        # doc_lengths_rdd = self.sc.parallelize(list(doc_lengths.items()))
+        # # Init scores with 0 for each doc
+        # scores = doc_lengths_rdd.flatMap(lambda x: [(x[0], 0)])
+        # # Loop over all words in query
+        # for term in query:
+        #     # Get docs that have this term
+        #     docs = self.sc.parallelize(inverted.read_a_posting_list('.', term, self.bucket_name))
+        #     # docs = sc.parallelize(read_posting_list(inverted, term))
+        #     # Get (doc_id, tf_idf) pairs
+        #     docs_by_id = docs.groupByKey().mapValues(lambda x: list(x))
+        #     # Calculate scores
+        #     part_scores = docs_by_id.flatMap(lambda x: [(x[0], np.sum([tf_idf for tf_idf in x[1]]))])
+        #     scores = scores.leftOuterJoin(part_scores)
+        # scores = scores.flatMap(lambda x: [(x[0], x[1][0] + x[1][1]) if x[1][1] is not None else (x[0], 0)])
+        # # Normalize each score by the doc's length
+        # scores = scores.join(doc_lengths_rdd).flatMap(lambda x: [(x[0], x[1][0] / x[1][1])])
+
         # Init scores with 0 for each doc
-        scores = doc_lengths_rdd.flatMap(lambda x: [(x[0], 0)])
+        scores = {k: 0 for k in doc_lengths.keys()}
         # Loop over all words in query
         for term in query:
             # Get docs that have this term
-            docs = self.sc.parallelize(inverted.read_a_posting_list('.', term, self.bucket_name))
-            # docs = sc.parallelize(read_posting_list(inverted, term))
-            # Get (doc_id, tf_idf) pairs
-            docs_by_id = docs.groupByKey().mapValues(lambda x: list(x))
+            # docs = sc.parallelize(inverted.read_a_posting_list('.', term))
+            docs = inverted.read_a_posting_list('.', term, self.bucket_name)
             # Calculate scores
-            part_scores = docs_by_id.flatMap(lambda x: [(x[0], np.sum([tf_idf for tf_idf in x[1]]))])
-            scores = scores.leftOuterJoin(part_scores)
-        scores = scores.flatMap(lambda x: [(x[0], x[1][0] + x[1][1]) if x[1][1] is not None else (x[0], 0)])
+            for doc in docs:
+                scores[doc[0]] += doc[1]
         # Normalize each score by the doc's length
-        scores = scores.join(doc_lengths_rdd).flatMap(lambda x: [(x[0], x[1][0] / x[1][1])])
+        scores = {k: scores[k] / doc_lengths[k] for k in scores.keys()}
+
         return scores
 
     def weighted_score(self, title_scores, text_scores, anchor_scores=None):
-        if anchor_scores != None:
-            # Join the RDDs based on the doc_id
-            joined_rdd = title_scores.join(text_scores).join(anchor_scores)
+        # if anchor_scores != None:
+        #     anchor_dict = anchor_scores.collectAsMap()
+        #     # Join the RDDs based on the doc_id
+        #     joined_rdd = title_scores.join(text_scores).join(anchor_scores)
+        #
+        #     # Compute the weighted sum for each doc_id
+        #     weighted_sum = joined_rdd.flatMap(lambda x: (x[0],
+        #                                                  x[1][0][0] * self.title_score +
+        #                                                  x[1][0][1] * self.text_score +
+        #                                                  x[1][1] * self.anchor_score
+        #                                                  ))
+        # else:
+        #     # Join the RDDs based on the doc_id
+        #     joined_rdd = title_scores.join(text_scores)
+        #
+        #     # Compute the weighted sum for each doc_id
+        #     weighted_sum = joined_rdd.flatMap(lambda x: [(x[0],
+        #                                                   x[1][0] * self.title_score +
+        #                                                   x[1][1] * self.text_score
+        #                                                   )])
+        #
+        # # weighted_sum = {k: self.title_score * title_dict[k] + self.text_score * text_dict[k] for k, v in title_dict}
+        # # Sort docs by score
+        # sorted_docs = list(weighted_sum).sort(reverse=True, key=lambda x: x[1])
+        # sorted_docs = weighted_sum.sortBy(lambda x: x[1], ascending=False)
 
-            # Compute the weighted sum for each doc_id
-            weighted_sum = joined_rdd.flatMap(lambda x: (x[0],
-                                                         x[1][0][0] * self.title_score +
-                                                         x[1][0][1] * self.text_score +
-                                                         x[1][1] * self.anchor_score
-                                                         ))
-        else:
-            # Join the RDDs based on the doc_id
-            joined_rdd = title_scores.join(text_scores)
+        weighted_sum = {k: self.title_score * title_scores.get(k, 0) + self.text_score * text_scores.get(k, 0) for k in
+                        self.title_id.keys()}
 
-            # Compute the weighted sum for each doc_id
-            weighted_sum = joined_rdd.flatMap(lambda x: [(x[0],
-                                                          x[1][0] * self.title_score +
-                                                          x[1][1] * self.text_score
-                                                          )])
         # Sort docs by score
-        return weighted_sum.sortBy(lambda x: x[1], ascending=False)
+        sorted_docs = dict(sorted(weighted_sum.items(), key=lambda x: x[1], reverse=True))
+
+        return sorted_docs
 
 
     def combine_scores(self, cosine_scores, pagerank_scores, alpha=0.5):
