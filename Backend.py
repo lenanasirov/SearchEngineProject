@@ -175,7 +175,6 @@ class Backend:
     def init_spark(self):
         graphframes_jar = 'https://repos.spark-packages.org/graphframes/graphframes/0.8.2-spark3.2-s_2.12/graphframes-0.8.2-spark3.2-s_2.12.jar'
         spark_jars = '/usr/local/lib/python3.7/dist-packages/pyspark/jars'
-        !wget - N - P $spark_jars $graphframes_jar
         # Initializing spark context
         # create a spark context and session
         self.conf = SparkConf().set("spark.ui.port", "4050")
