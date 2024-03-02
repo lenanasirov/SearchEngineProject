@@ -92,7 +92,7 @@ class Backend:
         scores = self.weighted_score(title_score, text_score)
         # retrive the top 100 doc ids
         # top_docs = [score[0] for score in scores.take(100)]
-        top_docs = scores[:100]
+        top_docs = scores.items()[:100]
         # returns (doc_id, title of doc_id) for the top 100 documents
         top = [(ID, self.title_id[id]) for ID in top_docs]
         return top
