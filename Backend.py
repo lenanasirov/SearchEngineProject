@@ -20,15 +20,15 @@ import matplotlib.pyplot as plt
 from pathlib import Path
 import itertools
 from time import time
-import hashlib
-from inverted_index_gcp import *
-import pyspark
-from pyspark.sql import *
-from pyspark.sql.functions import *
-from pyspark import SparkContext, SparkConf
-from pyspark.sql import SQLContext
-from pyspark.ml.feature import Tokenizer, RegexTokenizer
-from graphframes import *
+# import hashlib
+# from inverted_index_gcp import *
+# import pyspark
+# from pyspark.sql import *
+# from pyspark.sql.functions import *
+# from pyspark import SparkContext, SparkConf
+# from pyspark.sql import SQLContext
+# from pyspark.ml.feature import Tokenizer, RegexTokenizer
+# from graphframes import *
 def _hash(s):
     return hashlib.blake2b(bytes(s, encoding='utf8'), digest_size=5).hexdigest()
 
