@@ -92,10 +92,10 @@ class Backend:
         scores = self.weighted_score(title_score, text_score)
         # retrive the top 100 doc ids
         # top_docs = [score[0] for score in scores.take(100)]
-        top_docs = list(scores.items())[:100]
+        top_id = list(scores.keys())[:100]
         # returns (doc_id, title of doc_id) for the top 100 documents
-        top = [(ID, self.title_id[ID]) for ID in top_docs]
-        return top
+        top_id_title = [(ID, self.title_id[ID]) for ID in top_id]
+        return top_id_title
 
     def stem_query(self, query):
         # Stem the query terms and remove stopwords
