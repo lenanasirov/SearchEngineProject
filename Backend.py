@@ -121,7 +121,7 @@ class Backend:
         # Loop over all words in query
         for term in query:
             # Get docs that have this term
-            docs = self.sc.parallelize(inverted.read_a_posting_list('.', term))
+            docs = self.sc.parallelize(inverted.read_a_posting_list('.', term, self.bucket_name))
             # docs = sc.parallelize(read_posting_list(inverted, term))
             # Get (doc_id, tf_idf) pairs
             docs_by_id = docs.groupByKey().mapValues(lambda x: list(x))
