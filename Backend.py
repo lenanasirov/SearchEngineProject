@@ -78,7 +78,7 @@ class Backend:
 
         self.porter_stemmer = PorterStemmer()
         self.bucket_name = 'wikiproject-414111-bucket'
-        self.init_spark()
+        # self.init_spark()
         self.inverted_title = InvertedIndex.read_index('title_postings', 'index_title', self.bucket_name)
         self.inverted_text = InvertedIndex.read_index('text_postings', 'index_text', self.bucket_name)
         self.title_lengths = InvertedIndex.read_index('title_postings', 'title_lengths', self.bucket_name)
