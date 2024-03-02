@@ -20,8 +20,8 @@ import matplotlib.pyplot as plt
 from pathlib import Path
 import itertools
 from time import time
-# import hashlib
-# from inverted_index_gcp import *
+import hashlib
+from inverted_index_gcp import *
 # import pyspark
 # from pyspark.sql import *
 # from pyspark.sql.functions import *
