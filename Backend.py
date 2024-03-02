@@ -39,9 +39,9 @@ class Backend:
         self.spark = None
         self.sc = None
         self.conf = None
-        self.title_score = 0.45
+        self.title_score = 0.6
         self.text_score = 0.4
-        self.anchor_score = 0.15
+        self.anchor_score = 0
 
         # Put your bucket name below and make sure you can access it without an error
         # bucket_name = 'wikiproject-414111-bucket'
@@ -80,14 +80,14 @@ class Backend:
         self.bucket_name = 'wikiproject-414111-bucket'
         self.inverted_title = InvertedIndex.read_index('title_postings', 'index_title', self.bucket_name)
         self.inverted_text = InvertedIndex.read_index('text_postings', 'index_text', self.bucket_name)
-        self.title_lengths = InvertedIndex.read_index('.', 'title_lengths', self.bucket_name)
-        self.text_lengths = InvertedIndex.read_index('.', 'text_lengths', self.bucket_name)
+        self.title_lengths = InvertedIndex.read_index('title_postings', 'title_lengths', self.bucket_name)
+        self.text_lengths = InvertedIndex.read_index('text_postings', 'text_lengths', self.bucket_name)
         self.title_id = InvertedIndex.read_index('.', 'title_id', self.bucket_name)
 
     def backend_search(self, query):
         stemmed_query = self.stem_query(query)
         title_score = self.calculate_cosine_score(stemmed_query, self.title_lengths, self.inverted_title)
-        text_score = self.calculate_cosine_score(stemmed_query, self.text_lengths, self.inverted_title)
+        text_score = self.calculate_cosine_score(stemmed_query, self.text_lengths, self.inverted_text)
         scores = self.weighted_score(title_score, text_score)
         # retrive the top 100 doc ids
         top_docs = [score[0] for score in scores.take(100)]
