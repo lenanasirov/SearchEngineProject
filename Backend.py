@@ -83,6 +83,7 @@ class Backend:
         self.title_lengths = InvertedIndex.read_index('title_postings', 'title_lengths', self.bucket_name)
         self.text_lengths = InvertedIndex.read_index('text_postings', 'text_lengths', self.bucket_name)
         self.title_id = InvertedIndex.read_index('.', 'title_id', self.bucket_name)
+        self.init_spark()
 
     def backend_search(self, query):
         stemmed_query = self.stem_query(query)
@@ -114,14 +115,11 @@ class Backend:
           RDD
             An RDD where each element is a (doc_id, score).
         """
-        self.init_spark()
-        # Stem the query terms
-        stemmed_query = self.stem_query(query)
         doc_lengths_rdd = self.sc.parallelize(list(doc_lengths.items()))
         # Init scores with 0 for each doc
         scores = doc_lengths_rdd.flatMap(lambda x: [(x[0], 0)])
         # Loop over all words in query
-        for term in stemmed_query:
+        for term in query:
             # Get docs that have this term
             docs = self.sc.parallelize(inverted.read_a_posting_list('.', term))
             # docs = sc.parallelize(read_posting_list(inverted, term))
@@ -177,6 +175,7 @@ class Backend:
     def init_spark(self):
         graphframes_jar = 'https://repos.spark-packages.org/graphframes/graphframes/0.8.2-spark3.2-s_2.12/graphframes-0.8.2-spark3.2-s_2.12.jar'
         spark_jars = '/usr/local/lib/python3.7/dist-packages/pyspark/jars'
+        !wget - N - P $spark_jars $graphframes_jar
         # Initializing spark context
         # create a spark context and session
         self.conf = SparkConf().set("spark.ui.port", "4050")
