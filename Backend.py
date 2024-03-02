@@ -87,8 +87,8 @@ class Backend:
 
     def backend_search(self, query):
         stemmed_query = self.stem_query(query)
-        title_score = self.calculate_cosine_score(stemmed_query, self.title_lengths, self.inverted_title, 'title_postings')
-        text_score = self.calculate_cosine_score(stemmed_query, self.text_lengths, self.inverted_text, 'text_postings')
+        title_score = self.calculate_cosine_score(stemmed_query, self.title_lengths, self.inverted_title)
+        text_score = self.calculate_cosine_score(stemmed_query, self.text_lengths, self.inverted_text)
         scores = self.weighted_score(title_score, text_score)
         # retrive the top 100 doc ids
         top_docs = [score[0] for score in scores.take(100)]
@@ -101,7 +101,7 @@ class Backend:
         stemmed_query = [self.porter_stemmer.stem(term) for term in query.split() if term not in self.all_stopwords]
         return stemmed_query
 
-    def calculate_cosine_score(self, query, doc_lengths, inverted, base_dir):
+    def calculate_cosine_score(self, query, doc_lengths, inverted):
         """ Takes a  a query, and returns scores RDD with docs sorted by relevance.
         Parameters:
         -----------
@@ -121,7 +121,7 @@ class Backend:
         # Loop over all words in query
         for term in query:
             # Get docs that have this term
-            docs = self.sc.parallelize(inverted.read_a_posting_list(base_dir, term))
+            docs = self.sc.parallelize(inverted.read_a_posting_list('.', term))
             # docs = sc.parallelize(read_posting_list(inverted, term))
             # Get (doc_id, tf_idf) pairs
             docs_by_id = docs.groupByKey().mapValues(lambda x: list(x))
