@@ -22,13 +22,13 @@ import itertools
 from time import time
 import hashlib
 from inverted_index_gcp import *
-import pyspark
-from pyspark.sql import *
-from pyspark.sql.functions import *
-from pyspark import SparkContext, SparkConf
-from pyspark.sql import SQLContext
-from pyspark.ml.feature import Tokenizer, RegexTokenizer
-from graphframes import *
+#import pyspark
+#from pyspark.sql import *
+#from pyspark.sql.functions import *
+#from pyspark import SparkContext, SparkConf
+#rom pyspark.sql import SQLContext
+#from pyspark.ml.feature import Tokenizer, RegexTokenizer
+#from graphframes import *
 def _hash(s):
     return hashlib.blake2b(bytes(s, encoding='utf8'), digest_size=5).hexdigest()
 
@@ -39,9 +39,9 @@ class Backend:
         self.spark = None
         self.sc = None
         self.conf = None
-        self.title_score = 0.6
-        self.text_score = 0.4
-        self.anchor_score = 0
+        self.title_weight = 0.65
+        self.text_weight = 0.35
+        self.anchor_weight = 0
 
         # Put your bucket name below and make sure you can access it without an error
         # bucket_name = 'wikiproject-414111-bucket'
@@ -78,13 +78,11 @@ class Backend:
 
         self.porter_stemmer = PorterStemmer()
         self.bucket_name = 'wikiproject-414111-bucket'
-        self.init_spark()
+        #self.init_spark()
         self.inverted_title = InvertedIndex.read_index('title_postings', 'index_title', self.bucket_name)
         self.inverted_text = InvertedIndex.read_index('text_postings', 'index_text', self.bucket_name)
         self.title_lengths = InvertedIndex.read_index('title_postings', 'title_lengths', self.bucket_name)
-        self.title_lengths_rdd = self.sc.parallelize(list(self.title_lengths.items())) # TODO: Add this to bucket
         self.text_lengths = InvertedIndex.read_index('text_postings', 'text_lengths', self.bucket_name)
-        self.text_lengths_rdd = self.sc.parallelize(list(self.text_lengths.items())) # TODO: Add this to bucket
         self.title_id = InvertedIndex.read_index('.', 'title_id', self.bucket_name)
 
     def backend_search(self, query):
@@ -96,7 +94,7 @@ class Backend:
         # top_docs = [score[0] for score in scores.take(100)]
         top_id = list(scores.keys())[:100]
         # returns (doc_id, title of doc_id) for the top 100 documents
-        top_id_title = [(ID, self.title_id[ID]) for ID in top_id]
+        top_id_title = [(str(ID), self.title_id[ID]) for ID in top_id]
         return top_id_title
 
     def stem_query(self, query):
@@ -138,7 +136,8 @@ class Backend:
         # scores = scores.join(doc_lengths_rdd).flatMap(lambda x: [(x[0], x[1][0] / x[1][1])])
 
         # Init scores with 0 for each doc
-        scores = {k: 0 for k in doc_lengths.keys()}
+        #scores = {k: 0 for k in doc_lengths.keys()}
+        scores = {}
         # Loop over all words in query
         for term in query:
             # Get docs that have this term
@@ -146,7 +145,7 @@ class Backend:
             docs = inverted.read_a_posting_list('.', term, self.bucket_name)
             # Calculate scores
             for doc in docs:
-                scores[doc[0]] += doc[1]
+                scores[doc[0]] = scores.get(doc[0],0) + doc[1]
         # Normalize each score by the doc's length
         scores = {k: scores[k] / doc_lengths[k] for k in scores.keys()}
 
@@ -179,7 +178,7 @@ class Backend:
         # sorted_docs = list(weighted_sum).sort(reverse=True, key=lambda x: x[1])
         # sorted_docs = weighted_sum.sortBy(lambda x: x[1], ascending=False)
 
-        weighted_sum = {k: self.title_score * title_scores.get(k, 0) + self.text_score * text_scores.get(k, 0) for k in
+        weighted_sum = {k: self.title_weight * title_scores.get(k, 0) + self.text_weight * text_scores.get(k, 0) for k in
                         self.title_id.keys()}
 
         # Sort docs by score
