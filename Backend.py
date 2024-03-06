@@ -142,17 +142,17 @@ class Backend:
         # # Normalize each score by the doc's length
         # scores = scores.join(doc_lengths_rdd).flatMap(lambda x: [(x[0], x[1][0] / x[1][1])])
 
-        # Init scores with 0 for each doc
-        #scores = {k: 0 for k in doc_lengths.keys()}
-        scores = {}
-        # Loop over all words in query
+        scores = defaultdict(float)
+
+        # Loop over all words in the query
         for term in query:
             # Get docs that have this term
-            # docs = sc.parallelize(inverted.read_a_posting_list('.', term))
             docs = inverted.read_a_posting_list('.', term, self.bucket_name)
-            # Calculate scores
-            for doc in docs:
-                scores[doc[0]] = scores.get(doc[0],0) + doc[1]
+
+            # Calculate scores using list comprehension for efficiency
+            for doc_id, term_freq in docs:
+                scores[doc_id] += term_freq
+
         # Normalize each score by the doc's length
         scores = {k: scores[k] / doc_lengths[k] for k in scores.keys()}
 
