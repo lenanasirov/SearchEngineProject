@@ -112,7 +112,7 @@ class Backend:
         return query_terms
 
     def calculate_cosine_score(self, query, doc_lengths, inverted):
-        """ Takes a  a query, and returns scores RDD with docs sorted by relevance.
+        """ Takes a  a query, and returns scores Dict with docs paired with relevance.
         Parameters:
         -----------
           query: List
@@ -122,8 +122,8 @@ class Backend:
             A Dictionary where the keys are doc_id and the value are lengths (norms).
         Returns:
         --------
-          RDD
-            An RDD where each element is a (doc_id, score).
+          Dict
+            A RDD Dict each element is a (doc_id, score).
         """
         # doc_lengths_rdd = self.sc.parallelize(list(doc_lengths.items()))
         # # Init scores with 0 for each doc
