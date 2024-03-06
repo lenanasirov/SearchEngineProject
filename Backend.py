@@ -186,14 +186,19 @@ class Backend:
         # sorted_docs = weighted_sum.sortBy(lambda x: x[1], ascending=False)
 
         if anchor_scores != None:
-            weighted_sum = {k: self.title_weight * title_scores.get(k, 0) + self.text_weight * text_scores.get(k, 0)
-                            +self.anchor_weight * anchor_scores.get(k,0) for k in self.title_id.keys()}
-        else:
-            weighted_sum = {k: self.title_weight * title_scores.get(k, 0) + self.text_weight * text_scores.get(k, 0)
-                        for k in self.title_id.keys()}
+            keys = set(title_scores).union(text_scores).union(anchor_scores)
 
-        # Sort docs by score
-        sorted_docs = dict(sorted(weighted_sum.items(), key=lambda x: x[1], reverse=True))
+            weighted_sum = [(k, self.title_weight * title_scores.get(k, 0) + self.text_weight * text_scores.get(k, 0)
+                            + self.anchor_weight * anchor_scores.get(k, 0)) for k in keys]
+        else:
+            # Combine keys from both dictionaries
+            keys = set(title_scores).union(text_scores)
+
+            # Calculate weighted sum and sort in one step
+            weighted_sum = [(k, self.title_weight * title_scores.get(k, 0) + self.text_weight * text_scores.get(k, 0)) for k in
+                           keys]
+
+        sorted_docs = dict(sorted(weighted_sum, key=lambda x: x[1], reverse=True))
 
         return sorted_docs
 
