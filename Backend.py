@@ -105,10 +105,11 @@ class Backend:
 
     def stem_query(self, query):
         # Stem the query terms and remove stopwords
-        stemmed_query = [self.porter_stemmer.stem(term.group()) for term in self.RE_WORD.finditer(query.lower())
-                         if term not in self.all_stopwords]
+        stemmed_query = [self.porter_stemmer.stem(term.group()) for term in self.RE_WORD.finditer(query.lower())]
         #stemmed_query = [self.porter_stemmer.stem(term) for term in query.split() if term not in self.all_stopwords]
-        return stemmed_query
+        stop_tokens = set(stemmed_query).intersection(self.all_stopwords)
+        query_terms = [t for t in stemmed_query if t not in stop_tokens]
+        return query_terms
 
     def calculate_cosine_score(self, query, doc_lengths, inverted):
         """ Takes a  a query, and returns scores RDD with docs sorted by relevance.
