@@ -39,9 +39,9 @@ class Backend:
         self.spark = None
         self.sc = None
         self.conf = None
-        self.title_weight = 0.65
-        self.text_weight = 0.35
-        self.anchor_weight = 0
+        self.title_weight = 0.5
+        self.text_weight = 0.25
+        self.anchor_weight =0.25
 
         # Put your bucket name below and make sure you can access it without an error
         # bucket_name = 'wikiproject-414111-bucket'
@@ -81,15 +81,18 @@ class Backend:
         #self.init_spark()
         self.inverted_title = InvertedIndex.read_index('title_postings', 'index_title', self.bucket_name)
         self.inverted_text = InvertedIndex.read_index('text_postings', 'index_text', self.bucket_name)
+        self.inverted_anchor = InvertedIndex.read_index('anchor_postings', 'index_anchor', self.bucket_name)
         self.title_lengths = InvertedIndex.read_index('title_postings', 'title_lengths', self.bucket_name)
         self.text_lengths = InvertedIndex.read_index('text_postings', 'text_lengths', self.bucket_name)
+        self.anchor_lengths = InvertedIndex.read_index('anchor_postings', 'anchor_lengths', self.bucket_name)
         self.title_id = InvertedIndex.read_index('.', 'title_id', self.bucket_name)
 
     def backend_search(self, query):
         stemmed_query = self.stem_query(query)
         title_score = self.calculate_cosine_score(stemmed_query, self.title_lengths, self.inverted_title)
         text_score = self.calculate_cosine_score(stemmed_query, self.text_lengths, self.inverted_text)
-        scores = self.weighted_score(title_score, text_score)
+        anchor_score = self.calculate_cosine_score(stemmed_query, self.anchor_lengths, self.inverted_anchor)
+        scores = self.weighted_score(title_score, text_score, anchor_score)
         # retrive the top 100 doc ids
         # top_docs = [score[0] for score in scores.take(100)]
         top_id = list(scores.keys())[:100]
@@ -178,8 +181,12 @@ class Backend:
         # sorted_docs = list(weighted_sum).sort(reverse=True, key=lambda x: x[1])
         # sorted_docs = weighted_sum.sortBy(lambda x: x[1], ascending=False)
 
-        weighted_sum = {k: self.title_weight * title_scores.get(k, 0) + self.text_weight * text_scores.get(k, 0) for k in
-                        self.title_id.keys()}
+        if anchor_scores != None:
+            weighted_sum = {k: self.title_weight * title_scores.get(k, 0) + self.text_weight * text_scores.get(k, 0)
+                            +self.anchor_weight * anchor_scores.get(k,0) for k in self.title_id.keys()}
+        else:
+            weighted_sum = {k: self.title_weight * title_scores.get(k, 0) + self.text_weight * text_scores.get(k, 0)
+                        for k in self.title_id.keys()}
 
         # Sort docs by score
         sorted_docs = dict(sorted(weighted_sum.items(), key=lambda x: x[1], reverse=True))
