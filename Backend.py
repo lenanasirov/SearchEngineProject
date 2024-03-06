@@ -40,8 +40,8 @@ class Backend:
         self.sc = None
         self.conf = None
         self.title_weight = 0.5
-        self.text_weight = 0.25
-        self.anchor_weight =0.25
+        self.text_weight = 0.2
+        self.anchor_weight =0.3
 
         # Put your bucket name below and make sure you can access it without an error
         # bucket_name = 'wikiproject-414111-bucket'
@@ -86,13 +86,16 @@ class Backend:
         self.text_lengths = InvertedIndex.read_index('text_postings', 'text_lengths', self.bucket_name)
         self.anchor_lengths = InvertedIndex.read_index('anchor_postings', 'anchor_lengths', self.bucket_name)
         self.title_id = InvertedIndex.read_index('.', 'title_id', self.bucket_name)
+        self.pagerank = InvertedIndex.read_index('.', 'pagerank', self.bucket_name)
+
 
     def backend_search(self, query):
         stemmed_query = self.stem_query(query)
         title_score = self.calculate_cosine_score(stemmed_query, self.title_lengths, self.inverted_title)
         text_score = self.calculate_cosine_score(stemmed_query, self.text_lengths, self.inverted_text)
         anchor_score = self.calculate_cosine_score(stemmed_query, self.anchor_lengths, self.inverted_anchor)
-        scores = self.weighted_score(title_score, text_score, anchor_score)
+        scores= self.weighted_score(title_score, text_score, anchor_score)
+        #scores_final = self.combine_scores(scores, self.pagerank)
         # retrive the top 100 doc ids
         # top_docs = [score[0] for score in scores.take(100)]
         top_id = list(scores.keys())[:100]
@@ -194,16 +197,28 @@ class Backend:
         return sorted_docs
 
 
-    def combine_scores(self, cosine_scores, pagerank_scores, alpha=0.5):
+    def combine_scores(self, cosine_scores, pagerank_scores, alpha=0.6):
+        # # Normalize PageRank scores
+        # pagerank_sum = pagerank_scores.map(lambda x: x[1]).sum()
+        # normalized_pagerank_scores = pagerank_scores.map(lambda x: (x[0], x[1] / pagerank_sum))
+        #
+        # # Join cosine similarity scores and normalized PageRank scores
+        # combined_scores = cosine_scores.join(normalized_pagerank_scores)
+        #
+        # # Compute the combined score for each document
+        # combined_scores = combined_scores.map(lambda x: (x[0], alpha * x[1][0] + (1 - alpha) * x[1][1]))
+        #
+        # return combined_scores
+
         # Normalize PageRank scores
-        pagerank_sum = pagerank_scores.map(lambda x: x[1]).sum()
-        normalized_pagerank_scores = pagerank_scores.map(lambda x: (x[0], x[1] / pagerank_sum))
+        pagerank_sum = sum(pagerank_scores.values())
+        normalized_pagerank_scores = {doc_id: score / pagerank_sum for doc_id, score in pagerank_scores.items()}
 
         # Join cosine similarity scores and normalized PageRank scores
-        combined_scores = cosine_scores.join(normalized_pagerank_scores)
-
-        # Compute the combined score for each document
-        combined_scores = combined_scores.map(lambda x: (x[0], alpha * x[1][0] + (1 - alpha) * x[1][1]))
+        combined_scores = {}
+        for doc_id, cosine_score in cosine_scores.items():
+            if doc_id in normalized_pagerank_scores:
+                combined_scores[doc_id] = alpha * cosine_score + (1 - alpha) * normalized_pagerank_scores[doc_id]
 
         return combined_scores
 
