@@ -93,13 +93,10 @@ class Backend:
         self.pagerank = InvertedIndex.read_index('.', 'pagerank', self.bucket_name)
         pagerank_min = min(self.pagerank.values())
         pagerank_max = max(self.pagerank.values())
-        self.normalized_pagerank_scores = {doc_id: (score - pagerank_max) / (pagerank_max-pagerank_min)
+        self.normalized_pagerank_scores = {doc_id: (score - pagerank_min) / (pagerank_max-pagerank_min)
                                       for doc_id, score in self.pagerank.items()}
-        a = True
         self.disambiguation_docs = self.disambiguation_union()
-        if a:
-            print(self.disambiguation_docs)
-            a = False
+
 
 
     def disambiguation_union(self):
