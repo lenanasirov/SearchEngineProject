@@ -1,25 +1,29 @@
-import numpy as np
-import pandas as pd
-import bz2
-from functools import partial
-from collections import Counter, OrderedDict
-import pickle
-import heapq
-from itertools import islice, count, groupby
-from xml.etree import ElementTree
-import codecs
-import csv
-from google.cloud import storage
-import os
-import re
-from operator import itemgetter
+# import numpy as np
+# import pandas as pd
+# import bz2
+# from functools import partial
+# from collections import Counter, OrderedDict
+# import pickle
+# import heapq
+# from itertools import islice, count, groupby
+# from xml.etree import ElementTree
+# import codecs
+# import csv
+# from google.cloud import storage
+# import os
+# import re
+# from operator import itemgetter
 import nltk
 from nltk.stem.porter import *
+import tempfile
+import nltk
 from nltk.corpus import stopwords
-import matplotlib.pyplot as plt
-from pathlib import Path
-import itertools
-from time import time
+nltk.download('stopwords', download_dir=tempfile.gettempdir())
+nltk.data.path.append(tempfile.gettempdir())
+# import matplotlib.pyplot as plt
+# from pathlib import Path
+# import itertools
+# from time import time
 import hashlib
 from inverted_index_gcp import *
 #import pyspark

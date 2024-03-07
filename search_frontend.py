@@ -29,7 +29,6 @@ def search():
         list of up to 100 search results, ordered from best to worst where each 
         element is a tuple (wiki_id, title).
     '''
-    app.run(host='0.0.0.0', port=8080, debug=True, use_reloader=False)
     res = []
     query = request.args.get('query', '')
     if len(query) == 0:
@@ -179,4 +178,4 @@ def get_pageview():
 
 if __name__ == '__main__':
     # run the Flask RESTful API, make the server publicly available (host='0.0.0.0') on port 8080
-    app.run(host='0.0.0.0', port=8080, debug=True)
+    app.run(host='0.0.0.0', port=8080, debug=True, use_reloader=False)
