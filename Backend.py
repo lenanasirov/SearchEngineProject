@@ -87,10 +87,10 @@ class Backend:
         #self.anchor_lengths = InvertedIndex.read_index('anchor_postings', 'anchor_lengths', self.bucket_name)
         self.title_id = InvertedIndex.read_index('.', 'title_id', self.bucket_name)
         self.pagerank = InvertedIndex.read_index('.', 'pagerank', self.bucket_name)
-        pagerank_min = min(self.pagerank_scores.values())
-        pagerank_max = max(self.pagerank_scores.values())
+        pagerank_min = min(self.pagerank.values())
+        pagerank_max = max(self.pagerank.values())
         self.normalized_pagerank_scores = {doc_id: (score - pagerank_max) / (pagerank_max-pagerank_min) for doc_id, score in
-                                      self.pagerank_scores.items()}
+                                      self.pagerank.items()}
 
 
     def backend_search(self, query):
