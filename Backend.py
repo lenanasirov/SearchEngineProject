@@ -89,8 +89,8 @@ class Backend:
         self.pagerank = InvertedIndex.read_index('.', 'pagerank', self.bucket_name)
         pagerank_min = min(self.pagerank.values())
         pagerank_max = max(self.pagerank.values())
-        self.normalized_pagerank_scores = {doc_id: (score - pagerank_max) / (pagerank_max-pagerank_min) for doc_id, score in
-                                      self.pagerank.items()}
+        self.normalized_pagerank_scores = {doc_id: (score - pagerank_max) / (pagerank_max-pagerank_min)
+                                      for doc_id, score in self.pagerank.items()}
 
 
     def backend_search(self, query):
@@ -228,8 +228,8 @@ class Backend:
         # Join cosine similarity scores and normalized PageRank scores
         combined_scores = {}
         for doc_id, cosine_score in cosine_scores.items():
-            if doc_id in normalized_pagerank_scores:
-                combined_scores[doc_id] = alpha * cosine_score + (1 - alpha) * pagerank_scores[doc_id]
+            if doc_id in self.normalized_pagerank_scores:
+                combined_scores[doc_id] = alpha * cosine_score + (1 - alpha) * self.normalized_pagerank_scores[doc_id]
 
         return combined_scores
 
