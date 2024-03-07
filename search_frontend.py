@@ -29,6 +29,7 @@ def search():
         list of up to 100 search results, ordered from best to worst where each 
         element is a tuple (wiki_id, title).
     '''
+    app.run(host='0.0.0.0', port=8080, debug=True, use_reloader=False)
     res = []
     query = request.args.get('query', '')
     if len(query) == 0:
