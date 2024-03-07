@@ -87,13 +87,10 @@ class Backend:
         #self.anchor_lengths = InvertedIndex.read_index('anchor_postings', 'anchor_lengths', self.bucket_name)
         self.title_id = InvertedIndex.read_index('.', 'title_id', self.bucket_name)
         self.pagerank = InvertedIndex.read_index('.', 'pagerank', self.bucket_name)
-        self.normalized_pagerank = normalize_pagerank(self.pagerank)
-
-    def normalize_pagerank(self, pagerank):
-        pagerank_min = min(pagerank_scores.values())
-        pagerank_max = max(pagerank_scores.values())
-        normalized_pagerank_scores = {doc_id: (score - pagerank_max) / (pagerank_max-pagerank_min) for doc_id, score in pagerank_scores.items()}
-        return normalized_pagerank_scores
+        pagerank_min = min(self.pagerank_scores.values())
+        pagerank_max = max(self.pagerank_scores.values())
+        self.normalized_pagerank_scores = {doc_id: (score - pagerank_max) / (pagerank_max-pagerank_min) for doc_id, score in
+                                      self.pagerank_scores.items()}
 
 
     def backend_search(self, query):
@@ -103,7 +100,7 @@ class Backend:
         #anchor_score = self.calculate_cosine_score(stemmed_query, self.anchor_lengths, self.inverted_anchor)
         #scores = self.weighted_score(title_score, text_score, anchor_score)
         scores = self.weighted_score(title_score, text_score)
-        scores_final = self.combine_scores(scores, self.normalized_pagerank)
+        scores_final = self.combine_scores(scores, self.normalized_pagerank_scores)
         # retrive the top 100 doc ids
         # top_docs = [score[0] for score in scores.take(100)]
         top_id = list(scores_final.keys())[:100]
