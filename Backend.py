@@ -85,17 +85,38 @@ class Backend:
         #self.init_spark()
         self.inverted_title = InvertedIndex.read_index('title_postings', 'index_title', self.bucket_name)
         self.inverted_text = InvertedIndex.read_index('text_postings', 'index_text', self.bucket_name)
-        #self.inverted_anchor = InvertedIndex.read_index('anchor_postings', 'index_anchor', self.bucket_name)
+        self.inverted_anchor = InvertedIndex.read_index('anchor_postings', 'index_anchor', self.bucket_name)
         self.title_lengths = InvertedIndex.read_index('title_postings', 'title_lengths', self.bucket_name)
         self.text_lengths = InvertedIndex.read_index('text_postings', 'text_lengths', self.bucket_name)
-        #self.anchor_lengths = InvertedIndex.read_index('anchor_postings', 'anchor_lengths', self.bucket_name)
+        self.anchor_lengths = InvertedIndex.read_index('anchor_postings', 'anchor_lengths', self.bucket_name)
         self.title_id = InvertedIndex.read_index('.', 'title_id', self.bucket_name)
         self.pagerank = InvertedIndex.read_index('.', 'pagerank', self.bucket_name)
         pagerank_min = min(self.pagerank.values())
         pagerank_max = max(self.pagerank.values())
         self.normalized_pagerank_scores = {doc_id: (score - pagerank_max) / (pagerank_max-pagerank_min)
                                       for doc_id, score in self.pagerank.items()}
+        a = True
+        self.disambiguation_docs = self.disambiguation_union()
+        if a:
+            print(self.disambiguation_docs)
+            a = False
 
+
+    def disambiguation_union(self):
+        disambiguation_stem = self.porter_stemmer.stem('disambiguation')
+        disambiguation_title = self.inverted_title.read_a_posting_list('.', disambiguation_stem, self.bucket_name)
+        disambiguation_text = self.inverted_text.read_a_posting_list('.', disambiguation_stem, self.bucket_name)
+        disambiguation_anchor = self.inverted_anchor.read_a_posting_list('.', disambiguation_stem, self.bucket_name)
+        # Create sets of document IDs from the posting lists
+        doc_ids_title = set(doc_id for doc_id, _ in disambiguation_title)
+        doc_ids_text = set(doc_id for doc_id, _ in disambiguation_text)
+        doc_ids_anchor = set(doc_id for doc_id, _ in disambiguation_anchor)
+        # Compute the union of document IDs
+        union_doc_ids = doc_ids_title.union(doc_ids_text, doc_ids_anchor)
+        union_doc_ids_dict = defaultdict(int)
+        for doc_id in union_doc_ids:
+            union_doc_ids_dict[doc_id] = 0.0
+        return union_doc_ids_dict
 
     def backend_search(self, query):
         stemmed_query = self.stem_query(query)
@@ -152,7 +173,6 @@ class Backend:
         # scores = scores.join(doc_lengths_rdd).flatMap(lambda x: [(x[0], x[1][0] / x[1][1])])
 
         scores = defaultdict(float)
-
         # Loop over all words in the query
         for term in query:
             # Get docs that have this term
@@ -160,6 +180,11 @@ class Backend:
 
             # Calculate scores using list comprehension for efficiency
             for doc_id, term_freq in docs:
+
+                # Ignore document if it belongs to union_doc_ids_list
+                if doc_id in self.disambiguation_docs.keys():
+                    continue
+
                 scores[doc_id] += term_freq
 
         # Normalize each score by the doc's length
@@ -204,15 +229,16 @@ class Backend:
             keys = set(title_scores).union(text_scores)
 
             # Calculate weighted sum and sort in one step
-            weighted_sum = [(k, self.title_weight * title_scores.get(k, 0) + self.text_weight * text_scores.get(k, 0)) for k in
-                           keys]
+            weighted_sum = [(k, self.title_weight * title_scores.get(k, 0) + self.text_weight * text_scores.get(k, 0))
+                            for k in keys]
+
 
         sorted_docs = dict(sorted(weighted_sum, key=lambda x: x[1], reverse=True))
 
         return sorted_docs
 
 
-    def combine_scores(self, cosine_scores, pagerank_scores, alpha=0.5):
+    def combine_scores(self, cosine_scores, pagerank_scores, alpha=0.7):
         # # Normalize PageRank scores
         # pagerank_sum = pagerank_scores.map(lambda x: x[1]).sum()
         # normalized_pagerank_scores = pagerank_scores.map(lambda x: (x[0], x[1] / pagerank_sum))
