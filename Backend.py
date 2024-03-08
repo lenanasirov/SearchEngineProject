@@ -114,11 +114,11 @@ class Backend:
 
         # Stem and expand query
         stemmed_query = self.stem_query(query)
-        expanded_query = self.expand_query(query, stemmed_query)
+        # expanded_query = self.expand_query(query, stemmed_query)
 
         # Get documents from indexes, with relevance score
-        title_score = self.calculate_cosine_score(expanded_query, self.title_lengths, self.inverted_title)
-        text_score = self.calculate_cosine_score(expanded_query, self.text_lengths, self.inverted_text)
+        title_score = self.calculate_cosine_score(stemmed_query, self.title_lengths, self.inverted_title)
+        text_score = self.calculate_cosine_score(stemmed_query, self.text_lengths, self.inverted_text)
         # anchor_score = self.calculate_cosine_score(stemmed_query, self.anchor_lengths, self.inverted_anchor)
 
         # Calculate weighted sum of each score
@@ -173,21 +173,15 @@ class Backend:
             Dictionary containing document IDs and corresponding scores.
         """
         scores = defaultdict(float)
-        # Loop over all words in the query
-        for term in query:
-            # Get docs that have this term
-            docs = inverted.read_a_posting_list('.', term, self.bucket_name)
-
-            # Sum tf_idf for each doc
+        # Fetch postings for all terms in the query
+        all_docs = [inverted.read_a_posting_list('.', term, self.bucket_name) for term in query]
+        # Combine postings and calculate scores
+        for docs in all_docs:
             for doc_id, term_freq in docs:
-
-                # Ignore document if it belongs to disambiguation_docs
                 if self.disambiguation_docs[doc_id] != 1:
                     scores[doc_id] += term_freq
-
-        # Normalize each score by the doc's length
+        # Normalize scores
         scores = {k: scores[k] / doc_lengths[k] for k in scores.keys()}
-
         return scores
 
     def weighted_score(self, title_scores, text_scores, anchor_scores=None):
