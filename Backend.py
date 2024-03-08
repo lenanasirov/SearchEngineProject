@@ -43,8 +43,8 @@ class Backend:
         self.spark = None
         self.sc = None
         self.conf = None
-        self.title_weight = 0.6
-        self.text_weight = 0.4
+        self.title_weight = 0.55
+        self.text_weight = 0.45
         self.anchor_weight = 0
 
         # Put your bucket name below and make sure you can access it without an error
@@ -112,7 +112,7 @@ class Backend:
         union_doc_ids = doc_ids_title.union(doc_ids_text, doc_ids_anchor)
         union_doc_ids_dict = defaultdict(int)
         for doc_id in union_doc_ids:
-            union_doc_ids_dict[doc_id] = 0.0
+            union_doc_ids_dict[doc_id] = 0
         return union_doc_ids_dict
 
     def backend_search(self, query):
