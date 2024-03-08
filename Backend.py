@@ -109,11 +109,11 @@ class Backend:
         doc_ids_text = set(doc_id for doc_id, _ in disambiguation_text)
         doc_ids_anchor = set(doc_id for doc_id, _ in disambiguation_anchor)
         # Compute the union of document IDs
-        union_doc_ids = doc_ids_title.union(doc_ids_text, doc_ids_anchor)
-        union_doc_ids_dict = defaultdict(int)
-        for doc_id in union_doc_ids:
-            union_doc_ids_dict[doc_id] = 0
-        return union_doc_ids_dict
+        disambiguation_union_doc_ids = doc_ids_title.union(doc_ids_text, doc_ids_anchor)
+        disambiguation_union_doc_ids_dict = defaultdict(int)
+        for doc_id in disambiguation_union_doc_ids:
+            disambiguation_union_doc_ids_dict[doc_id] = 1
+        return disambiguation_union_doc_ids_dict
 
     def backend_search(self, query):
         stemmed_query = self.stem_query(query)
@@ -179,10 +179,8 @@ class Backend:
             for doc_id, term_freq in docs:
 
                 # Ignore document if it belongs to union_doc_ids_list
-                if doc_id in self.disambiguation_docs.keys():
-                    continue
-
-                scores[doc_id] += term_freq
+                if self.disambiguation_docs[doc_id] != 1:
+                    scores[doc_id] += term_freq
 
         # Normalize each score by the doc's length
         scores = {k: scores[k] / doc_lengths[k] for k in scores.keys()}
@@ -257,6 +255,8 @@ class Backend:
         for doc_id, cosine_score in cosine_scores.items():
             if doc_id in self.normalized_pagerank_scores:
                 combined_scores[doc_id] = alpha * cosine_score + (1 - alpha) * self.normalized_pagerank_scores[doc_id]
+            else:
+                combined_scores[doc_id] = cosine_score
 
         return combined_scores
 
