@@ -72,13 +72,13 @@ class Backend:
 
         # Get disambiguation pages
         self.disambiguation_docs = self.disambiguation_union()
-        #self.short_docs = self.find_short_docs()
+        self.short_docs = self.find_short_docs()
 
     def find_short_docs(self):
         # Assign document IDs to a dictionary
         short_doc_ids_dict = defaultdict(int)
         for doc_id in self.text_lengths:
-            if self.text_lengths[doc_id] > 0.8:
+            if self.text_lengths[doc_id] > 0.7:
                 short_doc_ids_dict[doc_id] = 1
         return short_doc_ids_dict
 
@@ -197,10 +197,10 @@ class Backend:
         # Combine postings and calculate scores
         for docs in all_docs:
             for doc_id, term_freq in docs:
-                if text and doc_lengths[doc_id] > 0.8:
-                    continue
-                # if self.short_docs[doc_id] == 1:
+                # if text and doc_lengths[doc_id] > 0.8:
                 #     continue
+                if self.short_docs[doc_id] == 1:
+                    continue
                 if self.disambiguation_docs[doc_id] != 1:
                     scores[doc_id] += term_freq
 
