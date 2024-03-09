@@ -6,6 +6,7 @@ import tempfile
 from nltk.corpus import stopwords
 from nltk.corpus import wordnet
 from nltk.tokenize import word_tokenize
+import inflect
 
 nltk.download('wordnet', download_dir=tempfile.gettempdir())
 nltk.download('stopwords', download_dir=tempfile.gettempdir())
@@ -48,7 +49,7 @@ class Backend:
         self.corpus_stopwords = ["category", "references", "also", "external", "links",
                                  "may", "first", "see", "history", "people", "one", "two",
                                  "part", "thumb", "including", "second", "following",
-                                 "many", "however", "would", "became"]
+                                 "many", "however", "would", "became", "who", "what", "why", "when", "was", "were"]
         self.all_stopwords = self.english_stopwords.union(self.corpus_stopwords)
         self.RE_WORD = re.compile(r"""[\#\@\w](['\-]?\w){2,24}""", re.UNICODE)
         self.porter_stemmer = PorterStemmer()
@@ -71,6 +72,15 @@ class Backend:
 
         # Get disambiguation pages
         self.disambiguation_docs = self.disambiguation_union()
+        #self.short_docs = self.find_short_docs()
+
+    def find_short_docs(self):
+        # Assign document IDs to a dictionary
+        short_doc_ids_dict = defaultdict(int)
+        for doc_id in self.text_lengths:
+            if self.text_lengths[doc_id] > 0.8:
+                short_doc_ids_dict[doc_id] = 1
+        return short_doc_ids_dict
 
     def disambiguation_union(self):
         """Get the union of disambiguation pages from different indexes.
@@ -85,13 +95,13 @@ class Backend:
         disambiguation_stem = self.porter_stemmer.stem('disambiguation')
         disambiguation_title = self.inverted_title.read_a_posting_list('.', disambiguation_stem, self.bucket_name)
         disambiguation_text = self.inverted_text.read_a_posting_list('.', disambiguation_stem, self.bucket_name)
-        disambiguation_anchor = self.inverted_anchor.read_a_posting_list('.', disambiguation_stem, self.bucket_name)
+        #disambiguation_anchor = self.inverted_anchor.read_a_posting_list('.', disambiguation_stem, self.bucket_name)
         # Create sets of document IDs from the posting lists
         doc_ids_title = set(doc_id for doc_id, _ in disambiguation_title)
         doc_ids_text = set(doc_id for doc_id, _ in disambiguation_text)
-        doc_ids_anchor = set(doc_id for doc_id, _ in disambiguation_anchor)
+        #doc_ids_anchor = set(doc_id for doc_id, _ in disambiguation_anchor)
         # Compute the union of document IDs
-        disambiguation_union_doc_ids = doc_ids_title.union(doc_ids_text, doc_ids_anchor)
+        disambiguation_union_doc_ids = doc_ids_title.union(doc_ids_text)#, doc_ids_anchor)
         # Assign document IDs to a dictionary
         disambiguation_union_doc_ids_dict = defaultdict(int)
         for doc_id in disambiguation_union_doc_ids:
@@ -114,11 +124,12 @@ class Backend:
 
         # Stem and expand query
         stemmed_query = self.stem_query(query)
-        # expanded_query = self.expand_query(query, stemmed_query)
+        #expanded_query = self.expand_query(query, stemmed_query)
+        #expanded_query = self.convert_numeric_to_text(query, stemmed_query)
 
         # Get documents from indexes, with relevance score
         title_score = self.calculate_cosine_score(stemmed_query, self.title_lengths, self.inverted_title)
-        text_score = self.calculate_cosine_score(stemmed_query, self.text_lengths, self.inverted_text)
+        text_score = self.calculate_cosine_score(stemmed_query, self.text_lengths, self.inverted_text, True)
         anchor_score = self.calculate_cosine_score(stemmed_query, self.anchor_lengths, self.inverted_anchor)
 
         # Calculate weighted sum of each score
@@ -149,12 +160,20 @@ class Backend:
             A list of stemmed query terms.
         """
         # Stem the query terms and remove stopwords
-        stemmed_query = [self.porter_stemmer.stem(term.group()) for term in self.RE_WORD.finditer(query.lower())]
-        stop_tokens = set(stemmed_query).intersection(self.all_stopwords)
-        query_terms = [t for t in stemmed_query if t not in stop_tokens]
-        return query_terms
+        tokens = [token.group() for token in self.RE_WORD.finditer(query.lower())]
+        stop_tokens = set(tokens).intersection(self.all_stopwords)
+        query_terms = [t for t in tokens if t not in stop_tokens]
+        stemmed_query = [self.porter_stemmer.stem(term) for term in query_terms]
+        return stemmed_query
 
-    def calculate_cosine_score(self, query, doc_lengths, inverted):
+        # stemmed_query = [self.porter_stemmer.stem(term.group()) for term in self.RE_WORD.finditer(query.lower())]
+        # stop_tokens = set(stemmed_query).intersection(self.all_stopwords)
+        # query_terms = [t for t in stemmed_query if t not in stop_tokens]
+        #return query_terms
+
+
+
+    def calculate_cosine_score(self, query, doc_lengths, inverted, text=False):
         """ Takes a query, and returns scores dictionary with docs paired with relevance.
         Parameters:
         -----------
@@ -178,11 +197,18 @@ class Backend:
         # Combine postings and calculate scores
         for docs in all_docs:
             for doc_id, term_freq in docs:
+                if text and doc_lengths[doc_id] > 0.8:
+                    continue
+                # if self.short_docs[doc_id] == 1:
+                #     continue
                 if self.disambiguation_docs[doc_id] != 1:
                     scores[doc_id] += term_freq
+
+
         # Normalize scores
         scores = {k: scores[k] / doc_lengths[k] for k in scores.keys()}
         return scores
+
 
     def weighted_score(self, title_scores, text_scores, anchor_scores=None):
         """Calculate weighted scores based on relevance scores of different components.
@@ -299,4 +325,42 @@ class Backend:
 
         stemmed_query.extend(stemmed_expanded)
 
+        return stemmed_query
+
+    def convert_numeric_to_text(self, query, stemmed_query):
+        """Convert numeric strings in the query to their textual representation.
+
+        Parameters:
+        -----------
+        query : str
+            The search query.
+
+        Returns:
+        --------
+        str:
+            The modified query with numeric strings converted to textual representation.
+        """
+        # Initialize inflect engine for converting numbers to words
+        p = inflect.engine()
+
+        # Tokenize the query
+        tokens = nltk.word_tokenize(query)
+
+        # Convert numeric strings to textual representation
+        converted_query = []
+        for token in tokens:
+            if token.isdigit():
+                # Convert the numeric string to its textual representation
+                text_representation = p.number_to_words(token)
+                text_representation = text_representation.replace('thousand', '').replace('hundred', '')
+                converted_query.append(text_representation)
+
+        # Join the converted tokens back into a string
+        converted_query_string = ' '.join(converted_query)
+
+        # Stem expanded query
+        stemmed_converted = self.stem_query(converted_query_string)
+           # [self.porter_stemmer.stem(term) for term in converted_query]
+
+        stemmed_query.extend(stemmed_converted)
         return stemmed_query
