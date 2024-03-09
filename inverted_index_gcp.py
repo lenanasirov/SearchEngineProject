@@ -144,7 +144,7 @@ class InvertedIndex:
             from the object's state dictionary. 
         """
         state = self.__dict__.copy()
-        del state['_posting_list']
+        # del state['_posting_list']
         return state
 
     def posting_lists_iter(self, base_dir, bucket_name=None):

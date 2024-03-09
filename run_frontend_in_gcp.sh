@@ -19,7 +19,7 @@ gcloud compute addresses create $IP_NAME --project=$PROJECT_NAME --region=$REGIO
 gcloud compute addresses list
 # note the IP address printed above, that's your extrenal IP address.
 # Enter it here: 
-INSTANCE_IP="34.30.130.2"
+INSTANCE_IP="34.133.129.132"
 
 # 2. Create Firewall rule to allow traffic to port 8080 on the instance
 gcloud compute firewall-rules create default-allow-http-8080 \
@@ -29,12 +29,9 @@ gcloud compute firewall-rules create default-allow-http-8080 \
 
 # 3. Create the instance. Change to a larger instance (larger than e2-micro) as needed.
 gsutil cp -r gs://wikiproject-414111-bucket/startup_script_gcp.sh ./  
-gsutil cp -r gs://wikiproject-414111-bucket/search_frontend.py ./   
-gsutil cp -r gs://wikiproject-414111-bucket/Backend.py ./   
-gsutil cp -r gs://wikiproject-414111-bucket/inverted_index_gcp.py ./
 gcloud compute instances create $INSTANCE_NAME \
   --zone=$ZONE \
-  --machine-type=e2-micro \
+  --machine-type=n2d-standard-4 \
   --network-interface=address=$INSTANCE_IP,network-tier=PREMIUM,subnet=default \
   --metadata-from-file startup-script=startup_script_gcp.sh \
   --scopes=https://www.googleapis.com/auth/cloud-platform \

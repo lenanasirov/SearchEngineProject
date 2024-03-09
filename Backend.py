@@ -6,6 +6,7 @@ import tempfile
 from nltk.corpus import stopwords
 from nltk.corpus import wordnet
 from nltk.tokenize import word_tokenize
+from concurrent.futures import ThreadPoolExecutor
 import inflect
 
 nltk.download('wordnet', download_dir=tempfile.gettempdir())
@@ -128,9 +129,9 @@ class Backend:
         #expanded_query = self.convert_numeric_to_text(query, stemmed_query)
 
         # Get documents from indexes, with relevance score
-        title_score = self.calculate_cosine_score(stemmed_query, self.title_lengths, self.inverted_title)
-        text_score = self.calculate_cosine_score(stemmed_query, self.text_lengths, self.inverted_text, True)
-        anchor_score = self.calculate_cosine_score(stemmed_query, self.anchor_lengths, self.inverted_anchor)
+        title_score = self.multithread_cosine_similarity(stemmed_query, self.title_lengths, self.inverted_title)
+        text_score = self.multithread_cosine_similarity(stemmed_query, self.text_lengths, self.inverted_text)
+        anchor_score = self.multithread_cosine_similarity(stemmed_query, self.anchor_lengths, self.inverted_anchor)
 
         # Calculate weighted sum of each score
         #scores = self.weighted_score(title_score, text_score)
@@ -171,7 +172,30 @@ class Backend:
         # query_terms = [t for t in stemmed_query if t not in stop_tokens]
         #return query_terms
 
+    def multithread_cosine_similarity(self, query, doc_lengths, inverted):
+        scores = defaultdict(float)
+        with ThreadPoolExecutor(max_workers=len(query)) as executor:  # Adjust max_workers as needed
+            futures = []
 
+            for term in query:
+                future = executor.submit(self.process_postings, term, scores, inverted)
+                futures.append(future)
+
+            # Wait for all futures to complete
+            for future in futures:
+                future.result()
+
+        # Normalize scores
+        normalized_scores = {k: scores[k] / doc_lengths[k] for k in scores.keys()}
+        return normalized_scores
+
+    def process_postings(self, term, scores, inverted):
+        docs = inverted.read_a_posting_list('.', term, self.bucket_name)
+        for doc_id, term_freq in docs:
+            # if text and doc_lengths[doc_id] > 0.8:
+            #     continue
+            if self.disambiguation_docs[doc_id] != 1 and self.short_docs[doc_id] != 1:
+                scores[doc_id] += term_freq
 
     def calculate_cosine_score(self, query, doc_lengths, inverted, text=False):
         """ Takes a query, and returns scores dictionary with docs paired with relevance.
