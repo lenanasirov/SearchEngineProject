@@ -36,9 +36,9 @@ class Backend:
         """Initialize Backend object with default parameters and load necessary indexes and dictionaries."""
 
         # Default weights for different components
-        self.title_weight = 0.55
-        self.text_weight = 0.45
-        self.anchor_weight = 0
+        self.title_weight = 0.6
+        self.text_weight = 0.3
+        self.anchor_weight = 0.1
 
         # GCP bucket name
         self.bucket_name = 'wikiproject-414111-bucket'
@@ -119,11 +119,11 @@ class Backend:
         # Get documents from indexes, with relevance score
         title_score = self.calculate_cosine_score(stemmed_query, self.title_lengths, self.inverted_title)
         text_score = self.calculate_cosine_score(stemmed_query, self.text_lengths, self.inverted_text)
-        # anchor_score = self.calculate_cosine_score(stemmed_query, self.anchor_lengths, self.inverted_anchor)
+        anchor_score = self.calculate_cosine_score(stemmed_query, self.anchor_lengths, self.inverted_anchor)
 
         # Calculate weighted sum of each score
-        scores = self.weighted_score(title_score, text_score)
-        # scores = self.weighted_score(title_score, text_score, anchor_score)
+        #scores = self.weighted_score(title_score, text_score)
+        scores = self.weighted_score(title_score, text_score, anchor_score)
 
         # Change scores according to pagerank
         scores_final = self.combine_scores(scores)
@@ -222,7 +222,7 @@ class Backend:
 
         return sorted_docs
 
-    def combine_scores(self, cosine_scores, alpha=0.7):
+    def combine_scores(self, cosine_scores, alpha=0.6):
         """Combine cosine similarity scores and PageRank scores.
 
         Parameters:
