@@ -9,6 +9,7 @@ from nltk.tokenize import word_tokenize
 from concurrent.futures import ThreadPoolExecutor
 import inflect
 
+# Download NLTK resources to a temporary directory
 nltk.download('wordnet', download_dir=tempfile.gettempdir())
 nltk.download('stopwords', download_dir=tempfile.gettempdir())
 nltk.download('punkt', download_dir=tempfile.gettempdir())
@@ -73,14 +74,23 @@ class Backend:
 
         # Get disambiguation pages
         self.disambiguation_docs = self.disambiguation_union()
+        # Get short pages
         self.short_docs = self.find_short_docs()
 
     def find_short_docs(self):
-        # Assign document IDs to a dictionary
+        """Get the short documents.
+
+        Returns:
+        --------
+        dict:
+            Dictionary where keys are document IDs and values are 1.
+        """
+        # Assign document IDs to a dictionary indicating short documents
         short_doc_ids_dict = defaultdict(int)
         for doc_id in self.text_lengths:
+            # Check if the text length exceeds a certain threshold
             if self.text_lengths[doc_id] > 0.7:
-                short_doc_ids_dict[doc_id] = 1
+                short_doc_ids_dict[doc_id] = 1  # Mark the document as short
         return short_doc_ids_dict
 
     def disambiguation_union(self):
@@ -96,13 +106,14 @@ class Backend:
         disambiguation_stem = self.porter_stemmer.stem('disambiguation')
         disambiguation_title = self.inverted_title.read_a_posting_list('.', disambiguation_stem, self.bucket_name)
         disambiguation_text = self.inverted_text.read_a_posting_list('.', disambiguation_stem, self.bucket_name)
-        #disambiguation_anchor = self.inverted_anchor.read_a_posting_list('.', disambiguation_stem, self.bucket_name)
+
         # Create sets of document IDs from the posting lists
         doc_ids_title = set(doc_id for doc_id, _ in disambiguation_title)
         doc_ids_text = set(doc_id for doc_id, _ in disambiguation_text)
-        #doc_ids_anchor = set(doc_id for doc_id, _ in disambiguation_anchor)
+
         # Compute the union of document IDs
-        disambiguation_union_doc_ids = doc_ids_title.union(doc_ids_text)#, doc_ids_anchor)
+        disambiguation_union_doc_ids = doc_ids_title.union(doc_ids_text)
+
         # Assign document IDs to a dictionary
         disambiguation_union_doc_ids_dict = defaultdict(int)
         for doc_id in disambiguation_union_doc_ids:
@@ -125,8 +136,6 @@ class Backend:
 
         # Stem and expand query
         stemmed_query = self.stem_query(query)
-        #expanded_query = self.expand_query(query, stemmed_query)
-        #expanded_query = self.convert_numeric_to_text(query, stemmed_query)
 
         # Get documents from indexes, with relevance score
         title_score = self.multithread_cosine_similarity(stemmed_query, self.title_lengths, self.inverted_title)
@@ -134,7 +143,6 @@ class Backend:
         anchor_score = self.multithread_cosine_similarity(stemmed_query, self.anchor_lengths, self.inverted_anchor)
 
         # Calculate weighted sum of each score
-        #scores = self.weighted_score(title_score, text_score)
         scores = self.weighted_score(title_score, text_score, anchor_score)
 
         # Change scores according to pagerank
@@ -160,24 +168,36 @@ class Backend:
         list:
             A list of stemmed query terms.
         """
-        # Stem the query terms and remove stopwords
+        # Tokenize the query, remove stopwords, and stem terms
         tokens = [token.group() for token in self.RE_WORD.finditer(query.lower())]
         stop_tokens = set(tokens).intersection(self.all_stopwords)
-        query_terms = [t for t in tokens if t not in stop_tokens]
-        stemmed_query = [self.porter_stemmer.stem(term) for term in query_terms]
+        query_terms = [t for t in tokens if t not in stop_tokens]      # Filter out stopwords
+        stemmed_query = [self.porter_stemmer.stem(term) for term in query_terms]    # Stem query terms
         return stemmed_query
 
-        # stemmed_query = [self.porter_stemmer.stem(term.group()) for term in self.RE_WORD.finditer(query.lower())]
-        # stop_tokens = set(stemmed_query).intersection(self.all_stopwords)
-        # query_terms = [t for t in stemmed_query if t not in stop_tokens]
-        #return query_terms
-
     def multithread_cosine_similarity(self, query, doc_lengths, inverted):
+        """Calculate cosine similarity scores using multithreading.
+
+        Parameters:
+        -----------
+        query : list
+            List of stemmed query terms.
+        doc_lengths : dict
+            Dictionary containing document lengths.
+        inverted : InvertedIndex
+            Inverted index object.
+
+        Returns:
+        --------
+        dict:
+            Dictionary containing normalized cosine similarity scores.
+        """
         scores = defaultdict(float)
         with ThreadPoolExecutor(max_workers=len(query)) as executor:  # Adjust max_workers as needed
             futures = []
 
             for term in query:
+                # Process postings for each term concurrently
                 future = executor.submit(self.process_postings, term, scores, inverted)
                 futures.append(future)
 
@@ -190,14 +210,24 @@ class Backend:
         return normalized_scores
 
     def process_postings(self, term, scores, inverted):
+        """Process posting lists for a given term.
+
+        Parameters:
+        -----------
+        term : str
+            Term to process.
+        scores : dict
+            Dictionary to store scores.
+        inverted : InvertedIndex
+            Inverted index object.
+        """
         docs = inverted.read_a_posting_list('.', term, self.bucket_name)
         for doc_id, term_freq in docs:
-            # if text and doc_lengths[doc_id] > 0.8:
-            #     continue
+            # Accumulate scores for relevant documents excluding disambiguation pages and short docs
             if self.disambiguation_docs[doc_id] != 1 and self.short_docs[doc_id] != 1:
                 scores[doc_id] += term_freq
 
-    def calculate_cosine_score(self, query, doc_lengths, inverted, text=False):
+    def calculate_cosine_score(self, query, doc_lengths, inverted):
         """ Takes a query, and returns scores dictionary with docs paired with relevance.
         Parameters:
         -----------
@@ -221,13 +251,11 @@ class Backend:
         # Combine postings and calculate scores
         for docs in all_docs:
             for doc_id, term_freq in docs:
-                # if text and doc_lengths[doc_id] > 0.8:
-                #     continue
+                # Accumulate scores for relevant documents excluding disambiguation pages and short docs
                 if self.short_docs[doc_id] == 1:
                     continue
                 if self.disambiguation_docs[doc_id] != 1:
                     scores[doc_id] += term_freq
-
 
         # Normalize scores
         scores = {k: scores[k] / doc_lengths[k] for k in scores.keys()}
@@ -260,7 +288,7 @@ class Backend:
             weighted_sum = [(k, self.title_weight * title_scores.get(k, 0) + self.text_weight * text_scores.get(k, 0)
                              + self.anchor_weight * anchor_scores.get(k, 0)) for k in keys]
         else:
-            # Combine keys from both dictionaries
+            # Combine scores from title and text dictionaries
             keys = set(title_scores).union(text_scores)
 
             # Calculate weighted sum
@@ -287,9 +315,9 @@ class Backend:
         dict:
             Dictionary containing combined scores.
         """
-        # For every doc, calculate weighted sum of scores and pagerank
         combined_scores = {}
         for doc_id, cosine_score in cosine_scores.items():
+            # Combine cosine similarity and PageRank scores using the specified weighting factor
             if doc_id in self.normalized_pagerank_scores:
                 combined_scores[doc_id] = alpha * cosine_score + (1 - alpha) * self.normalized_pagerank_scores[doc_id]
             else:
@@ -384,7 +412,6 @@ class Backend:
 
         # Stem expanded query
         stemmed_converted = self.stem_query(converted_query_string)
-           # [self.porter_stemmer.stem(term) for term in converted_query]
 
         stemmed_query.extend(stemmed_converted)
         return stemmed_query
