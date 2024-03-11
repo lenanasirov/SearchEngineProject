@@ -145,11 +145,8 @@ class Backend:
         # Calculate weighted sum of each score
         scores = self.weighted_score(title_score, text_score, anchor_score)
 
-        # Change scores according to pagerank
-        scores_final = self.combine_scores(scores)
-
         # Retrieve the top 100 doc ids
-        top_id = list(scores_final.keys())[:100]
+        top_id = list(scores.keys())[:100]
 
         # Get (doc_id, title of doc_id) for the top 100 documents
         top_id_title = [(str(ID), self.title_id[ID]) for ID in top_id]
